@@ -1,0 +1,28 @@
+rem /**
+rem  * setTracing.bbj
+rem  * @author ndecker
+rem  *
+rem  * Overview:
+rem  * This code demonstrates settracing to a file
+rem  *
+rem  */
+
+
+rem Program Options
+rem ====================
+useLocalTraceFile = 1
+useClientSideTracing = 0
+
+
+if (useLocalTraceFile) then
+    traceFile$ = dsk("") + dir("") + date(0:"%Y-%Mz-%Dz  %Hz:%mz:%sz") + ".trace.txt"
+else
+    traceFile$ = System.getProperty("basis.BBjHome") + "/trace.txt"
+endif
+erase traceFile$,err=*NEXT
+string traceFile$,err=ERR_SETTRACE
+traceFileChannel = unt
+open(traceFileChannel)traceFile$
+if (useLocalTraceFile) then mode$ = "FLUSH"
+settrace(traceFileChannel,mode=mode$)
+ERR_SETTRACE:

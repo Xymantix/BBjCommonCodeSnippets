@@ -1,0 +1,18 @@
+rem /**
+rem  * inBuiRunInDwcInstead.bbj
+rem  * @author ndecker
+rem  *
+rem  * Overview:
+rem  * This code checks to see if it's running in BUI, and if so, it changes it to run in the DWC instead
+rem  *
+rem  */
+
+
+rem If the app is running in BUI, switch it automatically to run in the DWC client instead
+if (info(3, 6) = "5") then
+    bui! = BBjAPI().getBuiManager()
+    url! = bui!.getUrl().replaceAll("apps", "webapp")
+    action! = bui!.urlAction(url!)
+    bui!.setEndAction(action!)
+    release
+endif

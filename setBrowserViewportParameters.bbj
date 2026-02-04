@@ -1,0 +1,9 @@
+
+REM Set the browser's viewport parameters so that the user cannot zoom
+#WebManager!.setMeta("viewport", "width=device-width,initial-scale=1,user-scalable=no,minimal-ui")
+
+
+REM ============================================
+REM Without using the #WebManager! field object
+REM ============================================
+BBjAPI().getWebManager!.setMeta("viewport", "width=device-width,initial-scale=1,user-scalable=no,minimal-ui")

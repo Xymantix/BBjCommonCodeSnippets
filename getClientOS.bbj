@@ -1,0 +1,6 @@
+REM Gets the client OS and adjusts preferences accordingly
+
+        rem Turn off tooltips on iOS
+        #thinClient! = BBjAPI().getThinClient()
+        #clientOs! = #thinClient!.getClientOSName().replaceAll(" ", "_")
+        if (#clientOs!.contains("iOS")) then #hashPrefs!.put("prefsTaskTips", "0")

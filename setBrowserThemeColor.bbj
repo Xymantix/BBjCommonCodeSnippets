@@ -1,0 +1,8 @@
+
+REM Sets the browser's theme color (for those that support it)
+#WebManager!.setMeta("theme-color", "#5C6F8A")
+
+REM ============================================
+REM Without using the #WebManager! field object
+REM ============================================
+BBjAPI().getWebManager!.setMeta("theme-color", "#5C6F8A")
