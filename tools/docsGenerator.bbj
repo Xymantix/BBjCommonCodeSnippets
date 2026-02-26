@@ -1,0 +1,84 @@
+REM /**
+REM  * docsGenerator.bbj
+REM  * @author ndecker
+REM  *
+REM  * Description:
+REM  * This is a utility program that generates JavaDocs for BBj source files in the project folder (the parent folder of this file).
+REM  * It uses the BBjDocsGenerator class from the BBjUtilities library to parse the source files and create the documentation.
+REM  *
+REM  * When you run this program, it will:
+REM  *  - Scan the project folder for .bbj files.
+REM  *  - Check if they contain class definitions and JavaDoc comments, and if so,
+REM  *  - Generate the documentation in an output "docs" folder within the project.
+REM  *  - Finally, it opens the generated documentation in the default web browser.
+REM  */
+
+
+REM Define this tools' folder and derive the project folder from it
+toolsPath! = dsk("")+dir("")
+
+REM Ensure that we have the correct separator
+fileSeparator! = File.separator
+if !(toolsPath!.contains(fileSeparator!)) then fileSeparator! = "/"
+
+REM Define the project path
+if (toolsPath!.endsWith(fileSeparator!)) then toolsPath! = toolsPath!.substring(0, toolsPath!.length() - 1)
+projectPath! = toolsPath!.substring(0, toolsPath!.lastIndexOf(fileSeparator!))
+
+REM Get a listing of all the .bbj files in the project folder and add them to the ArrayList
+projectFolder! = new File(projectPath!)
+filesList! = projectFolder!.list()
+programFiles! = new ArrayList()
+for i = 0 TO filesList!.length - 1
+    currentFile! = new File(projectPath! + fileSeparator! + filesList![i])
+    if (!currentFile!.isDirectory() AND currentFile!.getName().toLowerCase().endsWith(".bbj")) then
+        fileContents! = Utils.getFileBytes(currentFile!.getCanonicalPath())
+
+        REM Ensure that we're dealing with a BBj program containing a class definition and JavaDoc comments
+        if (fileContents!.toLowerCase().contains("classend")) AND (fileContents!.toLowerCase().contains("rem /**")) then
+            programFiles!.add(currentFile!.getCanonicalPath())
+        endif
+    endif
+next i
+
+REM Ensure that the output destination directory exists by calling mkdirs() - this will create the entire path
+REM if it doesn't already exist
+outputFolder! = new File(projectPath! + fileSeparator! + "docs")
+outputFolder!.mkdirs()
+
+REM Generate the JavaDocs
+generator! = new BBjDocsGenerator()
+params! = new BBjDocsParameters()
+params!.enableVerbose()
+params!.includePublicProtectedPrivateVisibility()
+generator!.generateBBjdoc(programFiles!, outputFolder!.getCanonicalPath(), params!)
+
+REM Print out the results
+print "Generated JavaDocs for " + str(programFiles!.size()) + " program files"
+print "JavaDocs located in: " + $0A09$ + outputFolder!.getCanonicalPath()
+print
+
+REM Open up the generated documentation in a browser
+url! = "file:///" + outputFolder!.getCanonicalPath().replaceAll(" ", "%20").replaceAll("\\","/") + "/index.html"
+BBjAPI().getThinClient().browse(url!)
+print "Press any key to continue...",
+read record(0,siz=1)
+release
+
+
+REM USE Statements
+use java.io.File
+use java.util.ArrayList
+use com.basis.bbjutilities.bbjdocsgenerator.BBjDocsGenerator
+use com.basis.bbjutilities.bbjdocsgenerator.BBjDocsParameters
+use ::../UberUtils.bbj::Utils
+
+REM DECLARE statements
+declare auto BBjString          toolsPath!
+declare auto BBjString          projectPath!
+declare auto File               projectFolder!
+declare auto File               outputFolder!
+declare auto File               currentFile!
+declare auto ArrayList          programFiles!
+declare auto BBjDocsGenerator   generator!
+declare auto BBjDocsParameters  params!
