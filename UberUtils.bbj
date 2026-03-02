@@ -1,0 +1,907 @@
+REM /**
+REM  * <code>Utils</code> is a BBj custom data class that provides various helpful utility methods
+REM  * for BBj applications, such as reading file contents, setting CSS properties,
+REM  * logging to the browser's console, and converting strings to Title Case.
+REM  *
+REM  * This specific file is meant to contain ALL utility methods used in various projects, so that
+REM  * I can easily maintain and reuse them across projects.  Projects may use a subset of the methods
+REM  * contained in this file, but each method should be generally useful in a wide variety of applications.
+REM  *
+REM  * The idea is that anytime I have the need to write a utility method, I should add it to this file so
+REM  * that it's available for all projects.  This way, I can avoid having multiple versions of the same
+REM  * utility method across different projects and I can also build up a large library of useful methods
+REM  * that are easily accessible.
+REM  *
+REM  * @author ndecker
+REM */
+REM package Utils
+
+
+class public Utils
+
+    REM /**
+    REM  * Method to get a file's contents in a BBjString variable, regardless of whether it's
+    REM  * a text or binary file and without taking into account the character encoding.
+    REM  * NOTE: This method read all bytes into memory in a single statement so do not use it
+    REM  * to read large files (2GB), as it could results in an OutOfMemoryError.
+    REM  * <p>
+    REM  * This method uses the Java Files::readAllBytes() method to get the contents of a file.
+    REM  * The utility's getFileContents() method is similar, except that method uses BBj
+    REM  * syntax to load the contents of a file.  In practice, that method will be slower
+    REM  * and will only return up to the first 10 megabytes of the file.  In contrast, this
+    REM  * method can be up to five times faster and it can read in over 1 gigabyte of data.
+    REM  * However, if you provide a file that is too large, it will result in an out of
+    REM  * memory error.
+    REM  *
+    REM  * @param   p_source$      A BBjString with the full path to the source file
+    REM  *
+    REM  * @return  The contents of the file in a BBjString variable
+    REM  *
+    REM  * @see <a href='https://docs.oracle.com/en/java/javase/11/docs/api/java.base/java/nio/file/Files.html#readAllBytes(java.nio.file.Path)' target='_blank'>Files::readString() documentation</a>
+    REM  * @since BBj 23.00
+    REM  */
+    method public static BBjString getFileBytes(BBjString p_source$)
+        declare auto File javaFile!
+
+        fileContents! = Files.readAllBytes(Path.of(p_source$),err=ERR_READ_ERROR)
+        contentsString! = cast(BBjString, new String(fileContents!))
+        methodret contentsString!
+
+        ERR_READ_ERROR:
+        javaFile! = new File(p_source$)
+        if !(javaFile!.exists()) then throw "Source file '" + p_source$ + "' does not exist", 700
+        throw "Source file '" + p_source$ + "' could not be read", 705
+    methodend
+
+
+    REM /**
+    REM  * Method to get a file's contents in a BBjString variable - Note that this method reads in a maximum of 10 megabytes.
+    REM  *
+    REM  * @param   p_source$      A BBjString with the full path to the source file
+    REM  *
+    REM  * @return  The contents of the file in a BBjString variable
+    REM  */
+    method public static BBjString getFileContents(BBjString p_source$)
+        REM Read the source file's contents
+        chan = unt
+        open(chan,isz=-1,err=ERR_NO_SOURCE_FILE)p_source$
+        readrecord(chan,SIZ=-10000000)fileContents$
+        close(chan)
+        methodret fileContents$
+
+        ERR_NO_SOURCE_FILE:
+        throw "Source file '" + p_source$ + "' does not exist", 700
+    methodend
+
+
+    REM /**
+    REM  * Method to set multiple string-based user preferences via a HashMap to reduce client-server round trips
+    REM  * <p>
+    REM  * The get/setCookies() methods bypasses the effort of creating string templates and BBjTemplatedStrings as well
+    REM  * as encoding information for safety and portability.  You only have to provide a unique key value that's used to
+    REM  * store the information (usually the app's name, but it can be virtually any string) and a HashMap filled
+    REM  * with the information to store.  The method iterates through the HashMap's keys and builds a string
+    REM  * that consists of the HashMap's key/value pairs joined by the <code>"-,-"</code> characters in an
+    REM  * attempt to provide a reasonable separator that won't interfere with the stored data.
+    REM  * <p>
+    REM  * Both get/setCookies() methods throw errors, so you may want to add an <code>,err=</code> branch when
+    REM  * calling these methods.  The getCookies() method will return a Hashmap filled with key/value pairs if
+    REM  * the cookie exists.  If it does not exist, it will return <code>null()</code>.
+    REM  * <p>
+    REM  * The corresponding <code>getCookies()</code> method is used to retrieve the stored information from the
+    REM  * client's computer (GUI) or browser (BUI/DWC).  You only need to provide the unique key value when getting
+    REM  * the saved cookies, greatly simplifying the reading/writing of user properties
+    REM  *
+    REM  * @param BBjString p_cookieKey$    A BBjString with the unique identifier for the saved cookie, such as the application's name
+    REM  * @param HashMap p_cookieHashMap!  A HashMap filled with key/value pairs to be stored where the key is the field name and the value is the string value for that field
+    REM  *
+    REM  * @see <a href='https://docs.oracle.com/en/java/javase/17/docs/api/java.base/java/util/HashMap.html' target='_blank'>HashMap</a> for more information on the Java HashMap object
+    REM  */
+    method public static void setCookies(BBjString p_cookieKey$, HashMap p_cookieHashMap!)
+        it! = p_cookieHashMap!.keySet().iterator()
+        while it!.hasNext()
+            key$ = it!.next()
+            value$ = str(p_cookieHashMap!.get(key$))
+            fullString$ = fullString$ + key$ + "-,-" + value$ + $0A$
+        wend
+        fullString$ = fullString$(1, len(fullString$)-1)
+
+        REM Encode the string contents and store it in the user properties based on the provided application key
+        encodedCookies$ = URLEncoder.encode(fullString$)
+        tc! = BBjAPI().getThinClient(err=ERR_GETTING_THINCLIENT)
+        tc!.setUserProperty(p_cookieKey$, encodedCookies$, err=ERR_WRITING_COOKIE)
+        methodret
+
+        ERR_GETTING_THINCLIENT:
+        throw "Error getting the BBjThinClient when trying to set cookies.  The error message was: " + errmes(-1), 725
+
+        ERR_WRITING_COOKIE:
+        throw "Error saving cookie.  The error message was: " + errmes(-1), 720
+    methodend
+
+
+    REM /**
+    REM  * Method to get multiple string-based user preferences in a HashMap to reduce client-server round trips
+    REM  * <p>
+    REM  * The get/setCookies() methods offer a simple way to persist application setting via a HashMap.  You
+    REM  * save information by calling the setCookies() method providing a unique key value that's used to
+    REM  * store the information (usually the app's name, but it can be virtually any string) and a HashMap filled
+    REM  * with the information to store.  You can then call the getCookies() method to retrieve the saved
+    REM  * information in a HashMap.  The methods bypass the effort of creating string templates and BBjTemplatedStrings
+    REM  * as well as encoding information for safety and portability.
+    REM  * <p>
+    REM  * Both get/setCookies() methods throw errors, so you may want to add an <code>,err=</code> branch when
+    REM  * calling these methods.  The getCookies() method will return a Hashmap filled with key/value pairs if
+    REM  * the cookie exists.  If it does not exist, it will return <code>null()</code>.
+    REM  *
+    REM  * @param BBjString p_cookieKey$    A BBjString with the unique identifier for the saved cookie, such as the application's name
+    REM  *
+    REM  * @return HashMap                  A HashMap filled with key/value pairs, basically a clone of the HahMap provided to the setCookies() method.  If the cookie doesn't exist on the client's machine or browser, the method retuns null().
+    REM  */
+    method public static HashMap getCookies(BBjString p_cookieKey$)
+        declare HashMap             hashCookies!
+
+        tc! = BBjAPI().getThinClient(err=ERR_GETTING_THINCLIENT)
+        prop$ = tc!.getUserProperty(p_cookieKey$, ERR=ERR_READING_COOKIE)
+        cookieValue! = URLDecoder.decode(prop$)
+        if (cookieValue! <> null()) then
+            hashCookies! = new HashMap()
+            fieldList! = java.util.Arrays.asList(cookieValue!.split($0A$))
+            for fieldNum = 0 to fieldList!.size()-1
+                keyVal! = fieldList!.get(fieldNum)
+                keyValVector! = java.util.Arrays.asList(keyVal!.split("-,-"))
+                hashCookies!.put(keyValVector!.get(0,err=*NEXT), keyValVector!.get(1,err=*NEXT))
+            next
+        endif
+        methodret hashCookies!
+
+        ERR_GETTING_THINCLIENT:
+        throw "Error getting the BBjThinClient when trying to get cookies.  The error message was: " + errmes(-1), 725
+
+        ERR_READING_COOKIE:
+        if (err=11) then
+            methodret null()
+        else
+            throw "Error reading cookie.  The error message was: " + errmes(-1), 720
+        endif
+    methodend
+
+
+    REM /**
+    REM  * Logs the provided string into the user's browser Developer Tools console or the BBjServices Debug file if necessary.
+    REM  *
+    REM  * Note that this is a convenience method that calls the consoleLogValues() method
+    REM  * with an empty string for the second parameter (the value).
+    REM  *
+    REM  * @param BBjString logEntry!   The information to display in the Developer Tools console
+    REM  */
+    method public static void consoleLog(BBjString logEntry!)
+        #consoleLogWithColors(logEntry!, "hsl(210, 90%, 94%)", "hsl(210, 35%, 35%)")
+    methodend
+
+
+    REM /**
+    REM  * Logs the provided strings, usually key/value pairs, into the user's browser Developer Tools console or the BBjServices Debug file if necessary.
+    REM  * <p>
+    REM  * If you're developing with VS Code, you can use its debug capabilities so that the
+    REM  * browser's Developer Tools console is available in VS Code's debug console.  This
+    REM  * allows you to view the browser's console output and interact with the interpreter
+    REM  * from within VS Code.
+    REM  *
+    REM  * @param BBjString key!        The first information to display in the Developer Tools console, typically the key in a key/value pair
+    REM  * @param BBjString value!      The second information to display in the Developer Tools console, typically the value in a key/value pair
+    REM  */
+    method public static void consoleLogValues(BBjString key!, BBjString value!)
+        REM Sanitize the log entries by escaping single quotes
+        if (key! = null()) then key! = ""
+        if (value! = null()) then value! = ""
+        key! = key!.replaceAll("'", "\'")
+        value! = value!.replaceAll("'", "\'")
+
+        REM Define the CSS to format the console output
+        space! = " "
+        cssSpace! = "'background: transparent;'"
+        cssDebugPrefix! = "'background: hsl(60, 100%, 65%); color: hsl(350, 100%, 25%); padding: 2px 4px; border-radius: 3px; border: 1px solid hsl(350, 100%, 25%); font-weight: 700;'"
+        cssKey! = "'background: hsl(210, 90%, 94%); color: hsl(210, 35%, 35%); padding: 2px 4px; border-radius: 3px; border: 1px solid hsl(210, 35%, 35%);'"
+        cssValue! = "'background: hsl(115, 90%, 94%); color: hsl(115, 35%, 35%); padding: 2px 4px; border-radius: 3px; border: 1px solid hsl(115, 35%, 35%);'"
+
+        REM Define the JavaScript that logs the information
+        js! = "console.log('%cDebug Log:%c%s%c%s%c%s%c%s', " + cssDebugPrefix! + ", " + cssSpace! + ", `" + space! + "`," + cssKey! + ", `" + key! + "`," + cssSpace! + ", `" + space! + "`," + cssValue! + ",`" + value! + "`);"
+
+        REM Log the information to the browser console or to the Debug file if we're not in a web environment
+        #logToConsoleOrDebug(js!, logEntry!)
+    methodend
+
+
+    REM /**
+    REM  * Logs the provided error string into the user's browser Developer Tools console using console.error(), or into the BBjServices Debug file if necessary.
+    REM  * <p>
+    REM  * If you're developing with VS Code, you can use its debug capabilities so that the
+    REM  * browser's Developer Tools console is available in VS Code's debug console.  This
+    REM  * allows you to view the browser's console output and interact with the interpreter
+    REM  * from within VS Code.
+    REM  *
+    REM  * @param BBjString consoleError!        The error information to display in the Developer Tools console.
+    REM  */
+    method public static void consoleError(BBjString consoleError!)
+        REM Sanitize the log entry by escaping single quotes
+        consoleError! = consoleError!.replaceAll("'", "\'")
+
+        REM Define the CSS to format the console output
+        space! = " "
+        cssSpace! = "'background: transparent;'"
+        cssDebugPrefix! = "'background: hsl(0, 100%, 90%); color: hsl(350, 100%, 25%); padding: 2px 4px; border-radius: 3px; border: 1px solid hsl(350, 100%, 25%); font-weight: 700;'"
+        cssConsoleError! = "'background: hsl(210, 90%, 94%); color: hsl(210, 35%, 35%); padding: 2px 4px; border-radius: 3px; border: 1px solid hsl(210, 35%, 35%);'"
+
+        REM Define the JavaScript that logs the information
+        js! = "console.error('%cError Log:%c%s%c%s', " + cssDebugPrefix! + ", " + cssSpace! + ", `" + space! + "`," + cssConsoleError! + ", `" + consoleError! + "`);"
+
+        REM Log the information to the browser console or to the Debug file if we're not in a web environment
+        #logToConsoleOrDebug(js!, logEntry!)
+    methodend
+
+
+    REM /**
+    REM  * Logs the provided string into the user's browser Developer Tools console using the provided CSS colors for the text's background and foreground.
+    REM  * As with all of this class's logging methods, if the JavaScript cannot be executed in the client's browser, such as when running in a non-web
+    REM  * environment, then the information will be logged to the BBjServices Debug file instead.
+    REM  * <p>
+    REM  * Note: The CSS color values can be in any valid CSS color format, such as:
+    REM  *  "red"
+    REM  *   "hsl(0, 100%, 50%)"
+    REM  *  "#800000"
+    REM  *  "#800"
+    REM  *  "rgb(192, 0, 0)"
+    REM  *
+    REM  * @param BBjString logEntry!               The information to display in the Developer Tools console
+    REM  * @param BBjString cssBackgroundColor!     The CSS color value to use for the background of the console log entry
+    REM  * @param BBjString cssForegroundColor!     The CSS color value to use for the foreground (text) of the console log entry
+    REM  */
+    method public static void consoleLogWithColors(BBjString logEntry!, BBjString cssBackgroundColor!, BBjString cssForegroundColor!)
+        REM Sanitize the log entries by escaping single quotes
+        if (logEntry! = null()) then logEntry! = ""
+        logEntry! = logEntry!.replaceAll("'", "\'")
+
+        REM Define the CSS to format the console output
+        space! = " "
+        cssSpace! = "'background: transparent;'"
+        cssDebugPrefix! = "'background: hsl(60, 100%, 65%); color: hsl(350, 100%, 25%); padding: 2px 4px; border-radius: 3px; border: 1px solid hsl(350, 100%, 25%); font-weight: 700;'"
+        cssKey! = "'background:" + cssBackgroundColor! + "; color: " + cssForegroundColor! + "; padding: 2px 4px; border-radius: 3px; border: 1px solid " + cssForegroundColor! + ";'"
+
+        REM Define the JavaScript that logs the information
+        js! = "console.log('%cDebug Log:%c%s%c%s', " + cssDebugPrefix! + ", " + cssSpace! + ", `" + space! + "`," + cssKey! + ", `" + logEntry! + "`);"
+
+        REM Log the information to the browser console or to the Debug file if we're not in a web environment
+        #logToConsoleOrDebug(js!, logEntry!)
+    methodend
+
+
+        REM /**
+        REM  * An internal utility method that logs the provided string into the user's browser Developer Tools console
+        REM  * using the provided JavaScript.  This is used as part of the implementation of other logging methods,
+        REM  * such as consoleLogWithColors(), to execute the JavaScript that logs the information to the console.
+        REM  * If the JavaScript cannot be executed in the browser, such as when running in a non-web environment, then
+        REM  * the method will log the information to the BBjServices Debug file instead.  The idea is that this method
+        REM  * provides a single point of maintenance for the logic that provides the logging functionality, as it determines
+        REM  * whether to log to the browser console or to the Debug file so that we don't duplicate that logic in multiple places.
+        REM  *
+        REM  * <b>Notes</b>:
+        REM  * <ul>
+        REM  *.   <li>This is a private method that is not meant to be called outside of this class.  It is only intended to be
+        REM  *         used as part of the implementation of the public logging methods in this class.</li>
+        REM  *    <li>The method assumes that if the JavaScript cannot be executed in the browser, then we are in a non-web
+        REM  *        environment and it falls back to logging to the BBjServices Debug file.</li>
+        REM  *    <li>When logging to the BBjServices Debug file, the method adds a timestamp to the log entry to provide
+        REM  *        context on when the log was generated.</li>
+        REM  *    <li>The method attempts to execute the JavaScript in an asynchronous manner when in a web environment to avoid
+        REM  *        blocking the main thread.  Executing JavaScript to log to the console is almost always going to be very fast,
+        REM  *        but there have been instances in the past where it can take much longer than expected/desired, as it has to
+        REM  *        send all the information over to the client for execution.  Logging to the Debug file is always fast, as it's
+        REM  *        always accomplished server-side, and is merely printing to Java's standard out.</li>
+        REM  * </ul>
+        REM  *
+        REM  * @param BBjString javaScript!     A BBjString containing the JavaScript to execute in the browser, which ultimately will log the information to the browser's Developer Tools console.
+        REM  * @param BBjString logEntry!       A BBjString containing the information to log to the Debug file in case the JavaScript cannot be executed in the browser.
+        REM  */
+    method private static void logToConsoleOrDebug(BBjString javaScript!, BBjString logEntry!)
+
+        REM If we're running in browser, we'll log the error message to the client's browser console.  This is true for BUI, DWC, and WebUI.
+        if (info(3,6) = "5" OR info(3,6) = "6" OR info(3,6) = "8") then
+            webManager! = BBjAPI().getWebManager()
+            webManager!.executeAsyncScript(javaScript!,err=ERR_NO_WEB_MANAGER)
+            methodret
+        endif
+
+        ERR_NO_WEB_MANAGER:
+            REM We couldn't get a web manager, so we'll print the log information to the standard output (BBjServer Debug Log)
+            dateTimestamp! = #getDateTimeInIso8601Format()
+            System.out.println("Debug Log [" + dateTimestamp! + "]: " + str(logEntry!))
+
+            REM Print the information out to the BBj sysConsole in case the app is running in a terminal and has access to the output
+            print "Debug Log [" + dateTimestamp! + "]: " + str(logEntry!)
+            methodret
+    methodend
+
+
+    REM /**
+    REM  * Utility method that sets a CSS custom property given the property and value.
+    REM  * It ensures that the CSS property is properly formatted, then builds a CSS
+    REM  * string from the information and adds it to the DOM, thus overriding any
+    REM  * previous setting.
+    REM  *
+    REM  * @param BBjString property!   A BBjString of the property name that will be set to the given value
+    REM  * @param BBjString value!      A BBjString of the value that propety will be set to
+    REM  */
+    method public static void setCssProperty(BBjString property!, BBjString value!)
+        REM Sanitize the property by ensuring that it starts with '--' and changing all spaces to dashes
+        if !(property!.startsWith("--")) then property! = "--" + property!
+        property! = property!.replaceAll(" ", "-").trim()
+        value! = value!.trim()
+
+        REM If the value contains spaces, such as a font-family listing, then it encloses the string in single quotes
+        if (value!.contains(" ")) then value! = "'" + value! + "'"
+
+        REM Build the CSS string for the root element and append it to the DOM's <body> element
+        css! = ":root { " + property! + ": " + value! + "; }"
+        BBjAPI().getWebManager().injectStyle(css!, 0, "app_custom_css_property")
+    methodend
+
+
+    REM ================================================================================================
+    REM Convert a string to title case
+    REM ================================================================================================
+    REM /**
+    REM  * Method to convert a given string to Title Case, meaning that the first letter of each word is capitalized and the rest is set to lowercase
+    REM  * <p>
+    REM  * Note that this is a convenience method to the more full-featured toTitleCase() method that allows you to optionally set whether the remainder strings are set to lowercase.
+    REM  *
+    REM  * @param BBjString string!             A BBjString to be converted to Title Case
+    REM  * @return BBjString                    The orginal string converted to Title Case
+    REM  */
+    method public static BBjString toTitleCase(BBjString string!)
+        methodret #toTitleCase(string!, 1)
+    methodend
+
+
+    REM /**
+    REM  * Method to convert a given string to Title Case, meaning that the first letter of each word is capitalized and the rest is optionally set to lowercase
+    REM  *
+    REM  * @param BBjString string!             A BBjString to be converted to Title Case
+    REM  * @param BBjNumber forceLowerCase      A BBjNumber acting as a boolean that indicates whether the method should force all non-titlecase letters to lowercase (1) or not (0).
+    REM  * @return BBjString                    The orginal string converted to Title Case
+    REM  */
+    method public static BBjString toTitleCase(BBjString string!, BBjNumber forceLowerCase)
+        use java.lang.Character
+        declare auto StringBuilder  rtnVal!
+
+        rtnVal! = new StringBuilder()
+        nextTitleCase = 1
+
+        if (forceLowerCase) then string! = string!.toLowerCase()
+
+        charArray! = string!.toCharArray()
+        for i = 0 to charArray!.length - 1
+            char! = charArray![i]
+            if !(Character.isLetterOrDigit(char!)) then
+                nextTitleCase = 1
+            else
+                if (nextTitleCase) then
+                    char! = Character.toTitleCase(char!)
+                    nextTitleCase = 0
+                endif
+            endif
+            rtnVal!.append(char!)
+        next
+        methodret rtnVal!.toString()
+    methodend
+
+
+    REM /**
+    REM  * Method to get a file's name from a fully-qualified path by stripping all the directories
+    REM  *
+    REM  * @param   p_source$      A BBjString with the full path to the source file
+    REM  *
+    REM  * @return  The name of the file without any directory information
+    REM  */
+    method public static BBjString getFileNameFromFullPath(BBjString p_source$)
+        declare File    file!
+
+        file! = #getJavaFile(p_source$)
+        methodret file!.getName(err=ERR_NO_SOURCE_FILE)
+
+        ERR_NO_SOURCE_FILE:
+        throw "Source file '" + p_source$ + "' does not exist", 700
+
+    methodend
+
+
+    REM /**
+    REM  * Method to return a file's base name by stripping its extension.  If the file
+    REM  *
+    REM  * @param   p_source$      A BBjString with either the filename or the full path to the source file
+    REM  *
+    REM  * @return  The file without its extension
+    REM  */
+    method public static BBjString getFileBaseName(BBjString p_source$)
+        declare auto BBjString filename!
+
+        filename! = #getFileNameFromFullPath(p_source$)
+        index = #getIndexOfFileExtension(filename!)
+
+        REM The file doesn't contain an extension
+        if (index < 0) then methodret filename!
+
+        methodret filename!.substring(0, index)
+    methodend
+
+
+    REM /**
+    REM  * Method to get a file's extension
+    REM  *
+    REM  * @param   p_source$      A BBjString with either the filename or the full path to the source file
+    REM  *
+    REM  * @return  The file's extension, or an empty string ("") if it does not contain an extension
+    REM  */
+    method public static BBjString getFileExtension(BBjString p_source$)
+        declare auto BBjString filename!
+
+        filename! = p_source$
+        index = #getIndexOfFileExtension(filename!)
+
+        REM The file doesn't contain an extension
+        if (index < 0) then methodret ""
+
+        methodret filename!.substring(index + 1)
+    methodend
+
+
+    REM /**
+    REM  * Method to return the index of a file's extension separator which is a dot.  If the file doesn't
+    REM  * have an extension, which can also occur when a file contains a dot within its path but is later
+    REM  * followed by the path separator character or slash, then the method will return -1.
+    REM  *
+    REM  * @param   p_source$      A BBjString with either the filename or the full path to the source file
+    REM  *
+    REM  * @return  The index of the file's last extension character, or -1 if there is no such character
+    REM  */
+    method public static BBjNumber getIndexOfFileExtension(BBjString p_source$)
+        declare auto BBjString filename!
+
+        filename! = p_source$
+        indexOfExtension = filename!.lastIndexOf(".")
+
+        REM The file doesn't contain an extension
+        if (indexOfExtension < 0) then methodret -1
+
+        if (filename!.lastIndexOf(System.getProperty("file.separator")) > indexOfExtension) then methodret -1
+        methodret indexOfExtension
+    methodend
+
+
+    REM /**
+    REM  * Method to get a file as a Java File object.  This method uses BBj's prefix capabilities if
+    REM  * the file cannot be opened with Java.
+    REM  *
+    REM  * @param   p_source$      A BBjString with the source file (doesn't have to be fully qualified)
+    REM  *
+    REM  * @return  The Java File object based on the source file
+    REM  */
+    method public static File getJavaFile(BBjString p_source$)
+        declare File    file!
+
+        REM Try to open the file with Java
+        file! = new File(p_source$)
+        if (file!.exists()) then goto GET_FILE_NAME
+
+        REM If we couldn't open the file with Java, then try to open it with BBj and its prefix capabilities
+        chan = unt
+        open(chan,isz=-1,err=ERR_NO_SOURCE_FILE)p_source$
+        p_source$ =  fid(chan)(9)
+        close(chan)
+        file! = new File(p_source$)
+
+GET_FILE_NAME:
+        methodret file!
+
+        ERR_NO_SOURCE_FILE:
+        throw "Source file '" + p_source$ + "' does not exist", 700
+
+    methodend
+
+
+    REM /**
+    REM  * Method to get a file's name without extension from a fully-qualified path by stripping all the directories, dot, and extension
+    REM  *
+    REM  * @param   p_source$      A BBjString with the full path to the source file
+    REM  *
+    REM  * @return  The name of the file without any directory information or extention
+    REM  */
+    method public static BBjString getFileNameWithoutExtensionFromFullPath(BBjString p_source$)
+        declare File    file!
+
+        file! = #getJavaFile(p_source$)
+        name! = file!.getName()
+        dotPos = name!.indexOf(".")
+        if (dotPos > 0) then name! = name!.substring(0, dotPos)
+        methodret name!
+
+        ERR_NO_SOURCE_FILE:
+        throw "Source file '" + p_source$ + "' does not exist", 700
+
+    methodend
+
+
+    REM /**
+    REM  * Method to get a file's path with its extension from a fully-qualified path by stripping all the directories, dot, and extension
+    REM  *
+    REM  * @param   p_source$      A BBjString with the full path to the source file
+    REM  *
+    REM  * @return  The file's path with the file separator character
+    REM  */
+    method public static BBjString getFilePathWithEndSeparator(BBjString p_source$)
+        declare File    file!
+        declare BBjString filePath!
+
+        file! = #getJavaFile(p_source$)
+        filePath! = file!.getAbsolutePath()
+        if (file!.isDirectory()) then
+            if !(filePath!.endsWith(File.separator)) then filePath! = filePath! + File.separator
+        else
+            throw "Source file '" + p_source$ + "'is not a directory", 730
+        endif
+        methodret filePath!
+    methodend
+
+
+    REM /**
+    REM  * Method to get a file's path without its extension from a fully-qualified path by stripping all the directories, dot, and extension
+    REM  *
+    REM  * @param   p_source$      A BBjString without the full path to the source file
+    REM  *
+    REM  * @return  The file's path without the file separator character
+    REM  */
+    method public static BBjString getFilePathWithoutEndSeparator(BBjString p_source$)
+        declare File    file!
+        declare BBjString filePath!
+
+        file! = #getJavaFile(p_source$)
+        filePath! = file!.getAbsolutePath()
+        if (file!.isDirectory()) then
+            if (filePath!.endsWith(File.separator)) then filePath! = filePath!.substring(0, filePath!.length() - len(File.separator))
+        else
+            throw "Source file '" + p_source$ + "'is not a directory", 730
+        endif
+        methodret filePath!
+    methodend
+
+
+    REM /**
+    REM  * Injects the CSS file given from the fileName! and appends it to the DOM
+    REM  * Alos sets the name of the CSS file to taskapp_filename_css.
+    REM  *
+    REM  * @param BBjString fileName!  The name of the CSS file to inject
+    REM  */
+    method public static void injectCSSFile(BBjString fileName!)
+        css! = #getFileContents(fileName!,err=ERR_NO_CSS)
+        baseName! = #getFileNameWithoutExtensionFromFullPath(fileName!)
+        if (baseName! = null()) then baseName! = "app_css"
+        if (css! <> null()) then
+                BBjAPI().getWebManager().injectStyle(css!, 0, "name=" + baseName!.toLowerCase().replace(".","_"))
+                methodret
+        endif
+
+        ERR_NO_CSS:
+        throw "CSS file '" + fileName! + "' does not exist", 700
+    methodend
+
+
+    REM /**
+    REM  * Reads in the contents of the given file name
+    REM  * <p>
+    REM  * Notes:
+    REM  *  1) This method uses BBj syntax to read in the file, so it may be slower than the readAllBytes() method, which uses Java NIO to read in the file.
+    REM  *  2) This method uses BBj syntax to read in the file, so it can find files using the prefix.
+    REM  *  3) This method reads in a maximum of 10 megabytes of data, so it should not be used for large files.
+    REM  *  4) This method may be slower than the readAllBytes() method, which uses Java NIO to read in the file
+    REM  *
+    REM  * @param BBjString fileName!  The name of the file to read in, which can be a fully qualified path or a path relative to the BBj prefix paths
+    REM  *
+    REM  * @return the contents of the file as a BBjString
+    REM  */
+    method public static BBjString readInFile(BBjString fileName!)
+        chan = unt
+        open(chan,isz=-1) fileName!
+        read record(chan,siz=10000000) file$
+        close(chan)
+
+        methodret file$
+    methodend
+
+
+    REM /**
+    REM  * Method to read all bytes from a file and return them as a BBjString.
+    REM  * <p>
+    REM  * This method uses Java NIO's Files.readAllBytes() and throws an error if the
+    REM  * source file cannot be found or read.
+    REM  * <p>
+    REM  * Notes:
+    REM  *  1) Since this method reads all bytes into memory, it should not be used for files larger than 2GB as it may result in an OutOfMemoryError.
+    REM  *  2) This method does not take into account character encoding, so it may not return the expected results for text files with certain encodings.
+    REM  *  3) This method is generally faster than the getFileContents() method, which uses BBj syntax to read a file, and is more limiting in terms of file size.
+    REM  *  4) This method probably needs a fully qualified path to the file, since it's using Java and doesn't use BBj's prefix capabilities.
+    REM  *
+    REM  * @param BBjString fileName!  The source file path to read
+    REM  *
+    REM  * @return BBjString           The file contents
+    REM  */
+    method public static BBjString readAllBytes(BBjString fileName!)
+        declare auto BBjString fileContents!
+        declare File javaFile!
+
+        fileContents! = Files.readAllBytes(Path.of(fileName!),err=ERR_READ_ERROR)
+        methodret fileContents!
+
+        ERR_READ_ERROR:
+        javaFile! = new File(fileName!)
+        if !(javaFile!.exists()) then throw "Source file '" + fileName! + "' does not exist", 700
+        throw "Source file '" + fileName! + "' could not be read", 705
+    methodend
+
+
+
+    REM /**
+    REM  * Converts a timestamp in MM/DD/YYYY_HHMM format to YYYY-MM-DD_HHMM format.
+    REM  *
+    REM  * @param BBjString p_date$  The input date string in MM/DD/YYYY_HHMM format
+    REM  *
+    REM  * @return BBjString         The converted date string, or an empty string if the input format length is invalid
+    REM  */
+    method public static BBjString getYMDdtsFromMDYdts(BBjString p_date$)
+        if (len(p_date$) = 15) then
+            methodret p_date$(7,4) + "-" + p_date$(1,5) + "_" + p_date$(12,4)
+        else
+            methodret ""
+        endif
+    methodend
+
+
+    REM /**
+    REM  * Converts a timestamp in YYYY-MM-DD_HHMM format to MM/DD/YYYY_HHMM format.
+    REM  *
+    REM  * @param BBjString p_date$  The input date string in YYYY-MM-DD_HHMM format
+    REM  *
+    REM  * @return BBjString         The converted date string, or an empty string if the input format length is invalid
+    REM  */
+    method public static BBjString getMDYdtsFromYMDdts(BBjString p_date$)
+        if (len(p_date$) = 15) then
+        methodret p_date$(6,5) + "-" + p_date$(1,4) + "_" + p_date$(12,4)
+        else
+            methodret ""
+        endif
+    methodend
+
+
+    REM /**
+    REM  * Captures the current high-resolution start time in nanoseconds.
+    REM  * <p>
+    REM  * This method is typically used in conjunction with the getElapsedTime() and getFormattedElapsedTime() methods
+    REM  * to measure and display elapsed time for operations or processes in your application.  The getElapsedTime() method
+    REM  * takes the start time captured by this method and calculates the elapsed time in milliseconds, while the
+    REM  * getFormattedElapsedTime() method provides a human-readable string of the elapsed time formatted as
+    REM  * milliseconds, seconds, minutes, or hours depending on the duration.
+    REM  *
+    REM  * Usage example:
+    REM  * <pre><code>
+    REM  * startTime! = Utils.getStartTime()
+    REM  * &nbsp;&nbsp;&nbsp;&nbsp;REM perform some operations here
+    REM  * elapsedTimeString! = Utils.getFormattedElapsedTime(startTime!)
+    REM  * print "The operation took " + elapsedTimeString!
+    REM  * </code></pre>
+    REM  *
+    REM  * @return BBjNumber  The current value from System.nanoTime()
+    REM  */
+    method public static BBjNumber getStartTime()
+        declare auto BBjNumber startTime!
+
+        startTime! = System.nanoTime()
+        methodret startTime!
+    methodend
+
+
+    REM /**
+    REM  * Calculates elapsed time in milliseconds from a start time captured by getStartTime().
+    REM  * <p>
+    REM  * This method is typically used in conjunction with the getStartTime() method to measure
+    REM  * the elapsed time for operations or processes in your application.  The getElapsedTime() method
+    REM  * takes the start time captured by this method and calculates the elapsed time in milliseconds, while the
+    REM  * getFormattedElapsedTime() method provides a human-readable string of the elapsed time formatted as
+    REM  * milliseconds, seconds, minutes, or hours depending on the duration.
+    REM  *
+    REM  * Usage example:
+    REM  * <pre><code>
+    REM  * startTime! = Utils.getStartTime()
+    REM  * &nbsp;&nbsp;&nbsp;&nbsp;REM perform some operations here
+    REM  * elapsedTimeString! = Utils.getFormattedElapsedTime(startTime!)
+    REM  * print "The operation took " + elapsedTimeString!
+    REM  * </code></pre>
+    REM  *
+    REM  * @param BBjNumber p_startTime!  The start time value returned by getStartTime()
+    REM  *
+    REM  * @return BBjNumber              Elapsed time in milliseconds
+    REM  */
+    method public static BBjNumber getElapsedTime(BBjNumber p_startTime!)
+        declare auto BBjNumber elapsedTime!
+
+        elapsedTime! = (System.nanoTime() - p_startTime!) / 1000000
+        methodret elapsedTime!
+    methodend
+
+
+    REM /**
+    REM  * Returns a human-readable elapsed time string from a start time captured by getStartTime().
+    REM  * <p>
+    REM  * Values are formatted as milliseconds, seconds, minutes, or hours depending on duration.
+    REM  *
+    REM  * This method is typically used in conjunction with the getStartTime() method to measure
+    REM  * the elapsed time for operations or processes in your application.  The getElapsed
+    REM  * Time() method takes the start time captured by the getStartTime() method and calculates the elapsed time
+    REM  * in milliseconds, while this getFormattedElapsedTime() method provides a human-readable string
+    REM  * of the elapsed time formatted as milliseconds, seconds, minutes, or hours depending on the duration.
+    REM  *
+    REM  * Usage example:
+    REM  * <pre><code>
+    REM  * startTime! = Utils.getStartTime()
+    REM  * &nbsp;&nbsp;&nbsp;&nbsp;REM perform some operations here
+    REM  * elapsedTimeString! = Utils.getFormattedElapsedTime(startTime!)
+    REM  * print "The operation took " + elapsedTimeString!
+    REM  * </code></pre>
+    REM  *
+    REM  * @param BBjNumber p_startTime!  The start time value returned by getStartTime()
+    REM  *
+    REM  * @return BBjString              The formatted elapsed time string
+    REM  */
+    method public static BBjString getFormattedElapsedTime(BBjNumber p_startTime!)
+        declare auto BBjString elapsedTimeString!
+
+        elapsedTimeMillis! = #getElapsedTime(p_startTime!)
+        elapsedTimeSeconds! = elapsedTimeMillis! / 1000
+        if (elapsedTimeSeconds! >= 60) then
+            elapsedTimeMinutes! = elapsedTimeSeconds! / 60
+            if (elapsedTimeMinutes! >= 60) then
+                elapsedTimeHours! = elapsedTimeMinutes! / 60
+                elapsedTimeString! = str(elapsedTimeHours!, "###,###,###,##0.00") + " hours"
+            else
+                elapsedTimeString! = str(elapsedTimeMinutes!, "###,###,###,##0.00") + " minutes"
+            endif
+        else
+            if (elapsedTimeSeconds! < 5) then
+                elapsedTimeString! = str(elapsedTimeMillis!, "###,###,###,##0") + " milliseconds"
+            else
+                elapsedTimeString! = str(elapsedTimeSeconds!, "###,###,###,##0.0") + " seconds"
+            endif
+        endif
+        methodret elapsedTimeString!.trim()
+    methodend
+
+
+    REM /**
+    REM  * Generates a random UUID and returns it as a string.
+    REM  *
+    REM  * @return BBjString  A randomly generated UUID in canonical string format
+    REM  */
+    method public static BBjString generateUUID()
+        methodret UUID.randomUUID().toString()
+    methodend
+
+
+    REM /**
+    REM  * Gets the current local date formatted as an ISO 8601 date string (YYYY-MM-DD).
+    REM  *
+    REM  * @return BBjString  The current date in ISO 8601 date format
+    REM  */
+    method public static BBjString getDateInIso8601Format()
+        methodret LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd"))
+    methodend
+
+
+    REM /**
+    REM  * Gets the current local date-time formatted as an ISO 8601 string (YYYY-MM-DDTHH:mm:ss).
+    REM  *
+    REM  * @return BBjString  The current date-time in ISO 8601 local date-time format
+    REM  */
+    method public static BBjString getDateTimeInIso8601Format()
+        methodret LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"))
+    methodend
+
+
+    REM /**
+    REM  * Gets the current local time formatted as an ISO 8601 string (HH:mm:ss).
+    REM  *
+    REM  * @return BBjString  The current time in ISO 8601 local time format
+    REM  */
+    method public static BBjString getTimeInIso8601Format()
+        methodret LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))
+    methodend
+
+
+    REM /**
+    REM  * Gets the current zoned date-time formatted as an ISO 8601 string with offset (YYYY-MM-DDTHH:mm:ss±HH:mm).
+    REM  *
+    REM  * @return BBjString  The current date-time with zone offset in ISO 8601 format
+    REM  */
+    method public static BBjString getDateTimeZoneInIso8601Format()
+        methodret ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"))
+    methodend
+
+
+    REM /**
+    REM  * Returns all files in the given directory whose file names match the provided regex pattern.
+    REM  * <p>
+    REM  * This method uses Java's File class to list all files in the specified directory and filters them
+    REM  * based on the provided regular expression pattern.  It returns a BBjVector containing the fully-qualified
+    REM  * paths of the matching files.  If the directory does not exist or cannot be read, it throws an error with code 710.
+    REM  *
+    REM  * @param BBjString p_dir!      The directory path to search
+    REM  * @param BBjString p_pattern!  A Java regular expression used to match file names
+    REM  *
+    REM  * @return BBjVector            A BBjVector of fully-qualified file paths matching the pattern
+    REM  *
+    REM  * @throws Error 710 if the directory does not exist or cannot be read
+    REM  * @see https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/util/regex/Pattern.html for regular expression syntax
+    REM  * @see https://regex101.com/ for testing regular expressions
+    REM  */
+    method public static BBjVector getFilesInDirectoryWithPattern(BBjString p_dir!, BBjString p_pattern!)
+        declare auto BBjVector filesVector!
+        declare File dir!
+
+        filesVector! = new BBjVector()
+        dir! = new File(p_dir!)
+        if (dir!.exists() and dir!.isDirectory()) then
+            fileList! = dir!.listFiles(err=ERR_READING_DIR)
+            for i = 0 to fileList!.length - 1
+                file! = fileList![i]
+                if (file!.getName().matches(p_pattern!)) then filesVector!.add(file!.getAbsolutePath())
+            next
+        endif
+        methodret filesVector!
+
+        ERR_READING_DIR:
+        throw "Directory '" + p_dir! + "' does not exist or could not be read", 710
+        methodret filesVector!
+    methodend
+
+classend
+
+
+
+
+REM ================================================================================================
+REM Use Statements
+REM ================================================================================================
+    REM BASIS libraries
+    use ::bbwindowutils.bbj::BBWindowUtils
+    use ::BBUtils.bbj::BBUtils
+    use ::BBXImage.bbj::BBXImage
+
+    use java.lang.String;       rem https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/lang/String.html
+    use java.awt.Color
+    use java.awt.Font
+    use java.util.HashMap
+    use java.util.TreeMap
+    use java.util.Set
+    use java.util.Iterator
+    use java.net.URL
+    use java.net.URLEncoder
+    use java.net.URLDecoder
+    use java.util.UUID
+    use java.lang.Character
+    use java.nio.file.Path
+    use java.nio.file.Paths
+    use java.util.TimeZone
+    use java.io.File;               rem https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/io/File.html
+    use java.nio.file.Files;        rem https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/nio/file/Files.html
+    use java.time.LocalDateTime;    rem https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/time/LocalDateTime.html
+    use java.time.LocalDate;        rem https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/time/LocalDate.html
+    use java.time.ZonedDateTime;     rem https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/time/ZonedDateTime.html
+    use java.time.format.DateTimeFormatter;     rem https://docs.oracle.com/en/java/javase/22/docs/api/java.base/java/time/format/DateTimeFormatter.html
+    use java.util.regex.Pattern;     rem https://docs.oracle.com/en/java/javase/21/docs/api/java.base/java/util/regex/Pattern.html
