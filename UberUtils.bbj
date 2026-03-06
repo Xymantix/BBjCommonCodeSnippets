@@ -277,7 +277,7 @@ class public Utils
 
 
         REM /**
-        REM  * An internal utility method that logs the provided string into the user's browser Developer Tools console
+        REM  * An <i>internal</i> utility method that logs the provided string into the user's browser Developer Tools console
         REM  * using the provided JavaScript.  This is used as part of the implementation of other logging methods,
         REM  * such as consoleLogWithColors(), to execute the JavaScript that logs the information to the console.
         REM  * If the JavaScript cannot be executed in the browser, such as when running in a non-web environment, then
@@ -287,7 +287,7 @@ class public Utils
         REM  *
         REM  * <b>Notes</b>:
         REM  * <ul>
-        REM  *.   <li>This is a private method that is not meant to be called outside of this class.  It is only intended to be
+        REM  *    <li>This is a private method that is not meant to be called outside of this class.  It is only intended to be
         REM  *         used as part of the implementation of the public logging methods in this class.</li>
         REM  *    <li>The method assumes that if the JavaScript cannot be executed in the browser, then we are in a non-web
         REM  *        environment and it falls back to logging to the BBjServices Debug file.</li>
@@ -373,6 +373,10 @@ class public Utils
     method public static BBjString toTitleCase(BBjString string!, BBjNumber forceLowerCase)
         use java.lang.Character
         declare auto StringBuilder  rtnVal!
+
+        REM Don't process null or empty strings
+        if (string! = null()) then methodret string!
+        if (len(string!.trim()) = 0) then methodret string!
 
         rtnVal! = new StringBuilder()
         nextTitleCase = 1
