@@ -1,0 +1,293 @@
+REM Sample BBj program that demonstrates the usage of the IconPoolBuilder utility class to register
+REM a custom DWC icon pool from a directory of SVG files, and then uses those icons in a simple UI.
+
+REM Since there are a few icons in this directory, we can build a custom pool by calling the
+REM fromDirectory() method and passing in the custom pool name and the current directory.
+REM This will read all of the SVG files in that directory and register them as icons in a pool
+REM with the name we specify.  We can then use those icons in any DWC component by setting the
+REM "pool" attribute to the name we registered, and the "name" attribute to the specific icon
+REM we want to use from that pool.
+IconPoolBuilder.fromDirectory("CustomIcons", dsk("") + dir(""))
+
+REM Now create a simple window with three buttons that use icons from our custom pool.
+REM Note that this example assumes that we have "icon-left-circle.svg", "icon-right-circle.svg",
+REM and "icon-close-circle.svg" files in the same directory as this program.
+window! = BBjAPI().openSysGui("X0").addWindow("DWC Icons", $001B0003$)
+window!.setCallback(BBjAPI.ON_CLOSE,"onClose")
+window!.setPanelStyle("display", "flex")
+window!.setPanelStyle("gap", "2em")
+window!.setPanelStyle("padding", "1em")
+
+REM Left Button with Left Arrow Icon
+buttonLeft! = window!.addButton("Left")
+icon! = window!.addWebComponent("dwc-icon")
+icon!.setAttribute("pool", "CustomIcons")
+icon!.setAttribute("name", "icon-left-circle")
+buttonLeft!.setSlot("prefix", icon!)
+
+REM Close Button with Close Icon
+buttonExit! = window!.addButton("Close")
+icon! = window!.addWebComponent("dwc-icon")
+icon!.setAttribute("pool", "CustomIcons")
+icon!.setAttribute("name", "icon-close-circle")
+buttonExit!.setSlot("prefix", icon!)
+
+REM Right Button with Right Arrow Icon
+buttonRight! = window!.addButton("Right")
+icon! = window!.addWebComponent("dwc-icon")
+icon!.setAttribute("pool", "CustomIcons")
+icon!.setAttribute("name", "icon-right-circle")
+buttonRight!.setSlot("prefix", icon!)
+
+process_events
+
+onClose:
+bye
+
+
+
+
+use java.io.File
+use java.nio.file.Files
+use java.nio.file.Path
+use java.util.HashMap
+use java.lang.StringBuilder
+
+REM /**
+REM  * <code>IconPoolBuilder</code> is a BBj utility class for creating and registering
+REM  * custom DWC icon pools.  The icon pool can be created from one of two different ways:
+REM  *  <ul>
+REM  *    <li>Calling the fromMap() method, passing in the name of the custom icon pool, and
+REM  *        a HashMap of SVG icons.  The HashMap's key is the name of the SVG icon, and the
+REM  *        value is the SVG markup (the contents of an SVG file).</li>
+REM  *    <li>Calling the fromDirectory() method, passing in the name of the custom icon pool, and
+REM  *        the path to a directory containing SVG files.  The class will scan the directory for
+REM  *        files ending in .svg, read their contents, and register each file as an icon in the
+REM  *        pool using their filename (minus the .svg extension) as the icon name in the pool.</li>
+REM  *  </ul>
+REM  *
+REM  * Thanks to Hyyan Abo Fakher for his contributions to the original Java version of this class.
+REM  *
+REM  * Sample Usage:
+REM  * <pre><code>
+REM  * REM Create a custom icon pool from a directory of SVG files
+REM  * svgDir! = dsk("") + dir("") + "../images/"
+REM  * IconPoolBuilder.fromDirectory("myCustomIcons", svgDir!)
+REM  *
+REM  * REM Create a button that will use an icon from our custom pool
+REM  * btn! = wnd!.addButton(102,120,10,100,30,"Exit")
+REM  *
+REM  * REM Now we can use the icons from that pool in our DWC UI components by setting
+REM  * REM the "pool" attribute to the name we registered, and the "name" attribute to the
+REM  * REM specific icon we want to use from that pool.  Note that this assumes that we
+REM  * REM have an "images" subfolder in our project directory with the "exit.svg" icon file in it.
+REM  * icon! = wnd!.addWebComponent("dwc-icon")
+REM  * icon!.setAttribute("pool", "myCustomIcons")
+REM  * icon!.setAttribute("name", "exit")
+REM  *
+REM  * REM Finally, we can set the icon as a prefix on the button so that it appears to the left of the button text.
+REM  * btn!.setSlot("prefix", icon!)
+REM  * </code></pre>
+REM  *
+REM  * <code>THROW</code>n Error Codes:
+REM  * <ul>
+REM  *      <li><b><code>700</code></b>: Invalid parameter.  The parameter provided to a method is null() or invalid.  Ensure all parameters are valid before calling the method.</li>
+REM  *      <li><b><code>701</code></b>: Invalid icon pool name parameter.  Ensure the icon pool name provided to the <code>fromMap()</code> method is valid before calling the method.</li>
+REM  *      <li><b><code>705</code></b>: Failed to execute JavaScript from the BBjWebManager.  Ensure that the program is running in a web environment, such running as a BUI or DWC application.</li>
+REM  *      <li><b><code>710</code></b>: Invalid icon folder parameter.  The icon folder path provided to the <code>fromDirectory()</code> method is invalid or does not exist.</li>
+REM  *      <li><b><code>711</code></b>: Invalid icon folder parameter.  The specified icon folder path is not a directory.</li>
+REM  *      <li><b><code>712</code></b>: Invalid icon folder parameter.  The specified icon folder path could not be opened.</li>
+REM  *      <li><b><code>713</code></b>: Invalid SVG file.  Attempting to read the contents of an SVG file failed.  See the error message for details.</li>
+REM  *  </ul>
+REM  */
+class public IconPoolBuilder
+
+    REM /**
+    REM  * Registers an icon pool from a HashMap, where each key is an icon name and
+    REM  * each value is the corresponding SVG markup.
+    REM  *
+    REM  * Note that this method doesn't return anything, but it will register the
+    REM  * icon pool with DWC so that the icons can be used in any DWC component
+    REM  * by setting the <code>pool</code> attribute to the name of the icon pool.
+    REM  *
+    REM  * @param BBjString name$   The icon pool name used when setting the <code>pool</code> attribute on <code>dwc-icon</code> components
+    REM  * @param HashMap icons!    A HashMap of icon name keys and SVG markup values
+    REM  */
+    method public static void fromMap(BBjString name$, HashMap icons!)
+        if (name$ = null()) then throw "The icon pool name must not be null", 700
+        if (icons! = null()) then throw "The icons map must not be null", 700
+
+        name$ = cvs(name$, 3)
+        if (len(name$) = 0) then throw "The icon pool name must not be empty", 701
+
+        validName$ = #buildValidName(name$)
+        script! = new StringBuilder()
+
+        REM Build the JavaScript object that will serve as the icon pool resolver
+        script!.append("const " + validName$ + " = {")
+        it! = icons!.keySet().iterator()
+        while it!.hasNext()
+            iconName$ = str(it!.next())
+            svg$ = str(icons!.get(iconName$))
+            iconName! = iconName$
+            iconName! = iconName!.replaceAll("'", "\\'")
+            script!.append("'" + iconName! + "': `" + svg$ + "`,")
+        wend
+        script!.append("};")
+
+        script!.append("(window.Dwc ??= {}).IconsPools ??= [];")
+        script!.append("window.Dwc.IconsPools.push({")
+        poolName! = name$
+        poolName! = poolName!.replaceAll("'", "\\'")
+        script!.append("name: '" + poolName! + "',")
+        script!.append("resolver: function(iconName) { return " + validName$ + "[iconName] ? `data:image/svg+xml,${encodeURIComponent(" + validName$ + "[iconName])}` : ''; },")
+        script!.append("});")
+
+        REM Register the icon pool with DWC by executing the generated JavaScript via the BBjWebManager.
+        BBjAPI().getWebManager().executeAsyncScript(script!.toString(), err=ERR_WEB_SCRIPT)
+        methodret
+
+        ERR_WEB_SCRIPT:
+        throw "Failed to register icon pool script via BBjWebManager: " + errmes(-1), 705
+    methodend
+
+
+    REM /**
+    REM  * Registers an icon pool by scanning the provided directory and loading all
+    REM  * files ending in <code>.svg</code> into the pool.
+    REM  *
+    REM  * Note that this method doesn't return anything, but it will register the
+    REM  * icon pool with DWC so that the icons can be used in any DWC component
+    REM  * by setting the <code>pool</code> attribute to the name of the icon pool.
+    REM  *
+    REM  * @param BBjString name$         The icon pool name to register in DWC
+    REM  * @param BBjString sourcePath!   The directory path containing SVG files
+    REM  */
+    method public static void fromDirectory(BBjString name$, BBjString sourcePath!)
+        declare HashMap icons!
+
+        icons! = #scanFolderForSvgFiles(sourcePath!)
+        #fromMap(name$, icons!)
+    methodend
+
+
+    REM /**
+    REM  * Scans a folder for SVG files and builds a HashMap where the key is the file
+    REM  * name without extension and the value is the full SVG file content.
+    REM  *
+    REM  * @param BBjString folder$   The source folder to scan for SVG files
+    REM  * @return HashMap            A HashMap of iconName -> svgContent
+    REM  */
+    method private static HashMap scanFolderForSvgFiles(BBjString folder$)
+        declare HashMap icons!
+
+        if (folder$ = null()) then throw "The source folder must not be null", 700
+
+        folder$ = #normalizeFolder(folder$)
+        dirFile! = new File(folder$)
+        if !(dirFile!.exists()) then throw "Icon pool folder does not exist: " + folder$, 710
+        if !(dirFile!.isDirectory()) then throw "Icon pool source is not a directory: " + folder$, 711
+
+        icons! = new HashMap()
+
+        REM Scan the provided directory for .svg files and read their content into the icons! map.
+        chan = unt
+        open(chan, err=ERR_OPEN_DIR) folder$
+        while 1
+            readrecord(chan, end=*BREAK) file$
+            fileName$ = cvs(file$, 3)
+            if (len(fileName$) = 0) then continue
+
+            REM Ensure that we only process .svg files, ignoring case.
+            lower! = fileName$
+            lower! = lower!.toLowerCase()
+            if (len(lower!) < 4) then continue
+            if !(lower!.endsWith(".svg")) then continue
+
+            REM We now have a valid SVG, so we'll add it to the icons! map
+            fullPath$ = folder$ + fileName$
+            svg$ = #readAllBytes(fullPath$)
+            iconName$ = #removeFileExtension(fileName$)
+            icons!.put(iconName$, svg$)
+        wend
+        close(chan)
+        methodret icons!
+
+        ERR_OPEN_DIR:
+        throw "Failed to open icon pool folder: " + folder$ + ". " + errmes(-1), 712
+    methodend
+
+
+    REM /**
+    REM  * Normalizes a source folder path by trimming whitespace, handling basic
+    REM  * <code>context://</code> prefixes, making relative paths application-relative,
+    REM  * and ensuring a trailing slash.
+    REM  *
+    REM  * @param BBjString folder$   The raw folder path provided by the caller
+    REM  * @return BBjString          A normalized folder path ending with '/'
+    REM  */
+    method private static BBjString normalizeFolder(BBjString folder$)
+        folder$ = cvs(folder$, 3)
+        if (len(folder$) = 0) then throw "The source folder must not be empty", 700
+
+        rem Basic support for context:// by treating it as app-relative.
+        if (len(folder$) >= 10) then
+            if (folder$(1,10) = "context://") then folder$ = folder$(11)
+        endif
+
+        rem If source is not absolute, resolve from current app path.
+        if (folder$(1,1) <> "/") then folder$ = dsk("") + dir("") + folder$
+
+        rem Ensure folder path ends with a slash for consistent processing later.
+        if (folder$(len(folder$),1) <> "/") then folder$ = folder$ + "/"
+
+        methodret folder$
+    methodend
+
+
+    REM /**
+    REM  * Reads all bytes from the provided file path and converts them to a BBjString.
+    REM  * This is used to load raw SVG markup from disk.
+    REM  *
+    REM  * @param BBjString filePath$   The full path to the SVG file
+    REM  * @return BBjString            The file content as a string
+    REM  */
+    method private static BBjString readAllBytes(BBjString filePath$)
+        bytes! = Files.readAllBytes(Path.of(filePath$), err=ERR_READ)
+        methodret cast(BBjString, new String(bytes!))
+
+        ERR_READ:
+        throw "Could not read SVG file: " + filePath$ + ". " + errmes(-1), 713
+    methodend
+
+
+    REM /**
+    REM  * Removes the file extension from a filename.
+    REM  *
+    REM  * @param BBjString fileName$   The filename, with or without extension
+    REM  * @return BBjString            The filename without its final extension
+    REM  */
+    method private static BBjString removeFileExtension(BBjString fileName$)
+        fileName! = fileName$
+        dotPos = fileName!.lastIndexOf(".")
+        if (dotPos < 0) then methodret fileName$
+
+        methodret str(fileName!.substring(0, dotPos))
+    methodend
+
+
+    REM /**
+    REM  * Converts the pool name into a JavaScript-safe variable identifier by replacing
+    REM  * invalid characters with underscores and appending a unique suffix.
+    REM  *
+    REM  * @param BBjString name$   The raw icon pool name
+    REM  * @return BBjString        A valid JavaScript variable name for the pool object
+    REM  */
+    method private static BBjString buildValidName(BBjString name$)
+        name! = name$
+        validName$ = str(name!.replaceAll("[^a-zA-Z0-9_$]", "_"))
+        methodret "__" + validName$ + "__webforj__icon__pool__"
+    methodend
+
+
+classend
