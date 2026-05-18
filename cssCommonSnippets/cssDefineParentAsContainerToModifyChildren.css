@@ -1,0 +1,93 @@
+/*
+This CSS snippet demonstrates how to define a parent element as a container for its children using the
+container-type property, which allows us to apply styles to the children based on certain conditions of
+the parent container.
+
+As a use case, CSS media queries allow us to apply styles based on the characteristics of the viewport,
+such as its width or height. However, container queries enable us to apply styles based on the
+characteristics of a specific container element, which can be particularly useful for responsive design
+and component-based development.  Using the "container-type" property, we can establish a parent element
+as a query container, which allows us to apply styles to its children based on the container's characteristics.
+So instead of being limited to applying styles based on the viewport size, we can apply styles based on the
+size of a specific parent container.
+
+Example Use Case:
+You have an icon that you want to be small when the main window is small, and grow larger as the main window grows.
+Typically, you would use a media query to achieve this. But, let's say that the application's main window has a
+maximum width and height. Therefore, as the user enlarges the browser window, the viewport continues to grow in
+size but the app's main window does not. By defining the parent container as a query container, you can apply
+styles to the icon based on the size of the parent container, allowing it to adjust its size dynamically as the
+main window changes, regardless of the viewport size.
+
+Documentation:
+@see https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/container-type
+An element can be established as a query container using the container-type CSS property. The container-type property
+is used to define the type of container context used in a container query. The available container contexts are:
+
+    Size: Enable selectively applying CSS rules to a container's children based on a general size or inline size
+        condition such as a maximum or minimum dimension, aspect ratio, or orientation.
+
+    Scroll-state: Enable selectively applying CSS rules to a container's children based on a scroll-state condition
+        such as whether the container is a scroll container that is partially scrolled or whether the container is
+        a snap target that is going to be snapped to its scroll snap container.
+
+    Anchored: Enable selectively applying CSS rules to a container's children based on whether the container is
+        anchor-positioned and has a position-try fallback option applied to it.
+
+
+    Keyword values:
+    container-type: normal;
+    container-type: size;
+    container-type: inline-size;
+    container-type: scroll-state;
+    container-type: anchored;
+
+    Two values can also be combined to create a container that supports multiple contexts, but
+    one of them MUST be scroll-state, and the other may be size or inline size, such as:
+    container-type: size scroll-state;
+
+ */
+
+ dwc-window-center.myMainWindow dwc-window-content {
+
+     /* The height of the main window will always be 100% of the viewport height */
+     height: 100dvh;
+
+     /* The width will be between 100% of the viewport width (for smaller screens) and a maximum of 1000px.
+     This allows the main window to adapt to different screen sizes while maintaining a consistent layout
+     and ensuring that the content is displayed optimally across various devices. */
+     min-width: min(1000px, 100dvw);
+     max-width: 1000px;
+
+     /* Define the main window as a container for its children, allowing us to apply styles to the children
+     based on the size of the main window. In this case, we will use the inline-size container type, which
+     allows us to apply styles based on the width of the container. */
+     container-type: inline-size;
+}
+
+
+/* The following container query allows us to hide the Previous/Next Image icons when the image container is
+too small (such as on mobile devices), since the icons can take up valuable space and may not be as useful
+on smaller screens where users are likely to use touch interactions instead of hover interactions. By hiding
+the icons on smaller screens, we can create a cleaner and more streamlined user interface that is optimized
+for touch interactions, while still providing the necessary functionality for navigating through images on
+larger screens where hover interactions are available. */
+@container (max-width: 400px) {
+
+    .myPreviousImageIcon, .myNextImageIcon {
+        display: none;
+    }
+
+}
+
+/* The following container query allows us to change the layout of the "card" element when the main window is
+wide enough to accommodate a more complex layout. When the width of the main window exceeds 750px, we can
+switch from a simple stacked layout to a grid layout that allows us to display more information side by side. */
+@container (width > 750px) {
+
+    .card {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+    }
+
+}
