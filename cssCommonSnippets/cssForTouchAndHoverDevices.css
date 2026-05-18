@@ -1,0 +1,30 @@
+/* This CSS file demonstrates how to apply different styles for touch devices (which do not support hover) and hover devices (like desktops with a mouse) */
+/* The media queries ensure that the appropriate styles are applied based on the device's capabilities. */
+
+
+/* Normal button styles that apply to all devices, including touch and hover devices */
+dwc-button {
+    background: #2d6cdf;
+    transition: transform 0.1s, filter 0.1s;
+}
+
+/* This section applies to touch devices only, where hovering is not possible */
+/* You'll typically want to style the element's :active state instead of its :hover state */
+@media (hover: none) and (pointer: coarse) {
+
+    dwc-button:active {
+        transform: scale(0.97);
+        filter: brightness(0.9);
+    }
+
+}
+
+ /* This restricts the hover effects to only apply on devices that support hover and have a fine pointer, e.g. a mouse. */
+ /*  Any CSS in here will not apply on touch devices, where hovering is not possible  */
+@media (hover: hover) and (pointer: fine) {
+
+    dwc-button::part(control):hover {
+        transform: scale(1.03);
+    }
+
+}
