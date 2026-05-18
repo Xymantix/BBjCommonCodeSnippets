@@ -1,0 +1,16 @@
+/* Ensure that controls always have enough padding to show the focus ring when they are focused,
+ so that keyboard users can see which control is focused via the DWC's focus ring. */
+
+/* The following CSS rule adds padding to the BBj controls so that when the control is focused,
+then the focus ring will be visible around it.  This is done by setting the padding to a value that is
+equal to the width of the focus ring plus the gap between the control and the focus ring. The focus
+ring width and gap are defined as CSS variables, which can be adjusted as needed. */
+
+/* If you do not add sufficient padding to the controls, depending on your layout the focus ring may be
+clipped or not visible, making it difficult for keyboard users to see which control is focused. */
+
+dwc-button, dwc-field, dwc-choicebox, dwc-radio, dwc-textfield {
+
+    padding: calc(var(--dwc-focus-ring-width) + var(--dwc-focus-ring-gap));
+
+}
