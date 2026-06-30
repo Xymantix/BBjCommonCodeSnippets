@@ -7,7 +7,7 @@ Whenever I start on a new application, I realize that I usually need to replicat
 from applications that I've written previously.  It occurred to me that instead of digging through previous applications for
 useful code, I could extract the useful portions and add them to a library of useful code.  After doing that for a while, I
 realized that it would be nice to have a Git repository for the samples.  I also figured that some of the code snippets
-might be useful to other BBj programmers, so I created a public repo for them.
+might be useful to other BBj programmers, so I created a public repo for them.  And now, that we're in the era of AI-assisted coding, it's even more important to have libraries of commonly-used code that can be fed to an AI so that they'll better understand how to program in BBj and, maybe more importantly, how *you* program in BBj.  By way of example, I've had to create a CLAUDE.md and examples directory with BBj programs so that Claude Code would be able to write Bbj code for me.
 
 **Who**:
 This repo is created under my Xymantix account, but my real name is Nick Decker and (as of this writing) I've been a BASIS employee
