@@ -16,3 +16,10 @@ that I use during daily life.  I was on BASIS' DWC (Dynamic Web Client) team and
 developing the DWC, so I usually default to writing DWC applications.  In addition to being able to run on the web in a browser,
 I often write apps that I can run on my smartphone.  I like to write visually appealing application that rely on CSS for both
 modifying the look and feel as well as providing responsive layouts using CSS Grid and CSS Flebox.
+
+# Tips and Tricks Documents
+The following documents are located in the `tips` subdirectory and include a variety of useful programming tips and tricks for writing both BBj and CSS code.
+- BBj Programming Tips and Tricks
+- CSS Coding Tips and Tricks
+- [BBj Programming Tips and Tricks](tips/BBjTips.md)
+- [CSS Coding Tips and Tricks](tips/CssTips.md)
