@@ -19,7 +19,5 @@ modifying the look and feel as well as providing responsive layouts using CSS Gr
 
 # Tips and Tricks Documents
 The following documents are located in the `tips` subdirectory and include a variety of useful programming tips and tricks for writing both BBj and CSS code.
-- BBj Programming Tips and Tricks
-- CSS Coding Tips and Tricks
 - [BBj Programming Tips and Tricks](tips/BBjTips.md)
 - [CSS Coding Tips and Tricks](tips/CssTips.md)
